@@ -3,6 +3,8 @@ import cors from 'cors';
 import pino from 'pino-http';
 import dotenv from 'dotenv';
 
+import { connectMongoDB } from './db/connectMongoDB.js';
+
 dotenv.config();
 
 const app = express();
@@ -20,7 +22,7 @@ app.use(
   })
 );
 
-// Routes
+// Routes (оставляем старые временно)
 app.get('/notes', (req, res) => {
   res.status(200).json({ message: 'Retrieved all notes' });
 });
@@ -28,10 +30,6 @@ app.get('/notes', (req, res) => {
 app.get('/notes/:noteId', (req, res) => {
   const { noteId } = req.params;
   res.status(200).json({ message: `Retrieved note with ID: ${noteId}` });
-});
-
-app.get('/test-error', () => {
-  throw new Error('Simulated server error');
 });
 
 // 404 middleware
@@ -45,7 +43,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: err.message });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Start server with MongoDB connection
+const startServer = async () => {
+  await connectMongoDB();
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+startServer();
