@@ -10,21 +10,23 @@ const noteSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      default: '',
       trim: true,
+      default: '',
     },
     tag: {
       type: String,
       enum: TAGS,
       default: 'Todo',
     },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Текстовый индекс для поиска
 noteSchema.index({ title: 'text', content: 'text' });
 
 export const Note = mongoose.model('Note', noteSchema);
