@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 import { connectMongoDB } from './db/connectMongoDB.js';
-import noteRoutes from './routes/noteRoutes.js';
+import noteRoutes from './routes/notesRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import { notFoundHandler } from './middlewares/notFound.js';
 import { errorHandler } from './middlewares/errorHandler.js';
