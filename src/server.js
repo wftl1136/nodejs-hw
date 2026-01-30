@@ -2,8 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import pino from 'pino-http';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 import { connectMongoDB } from './db/connectMongoDB.js';
+import noteRoutes from './routes/noteRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import { notFoundHandler } from './middlewares/notFound.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 
 dotenv.config();
 
@@ -13,6 +18,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 app.use(
   pino({
     transport: {
@@ -22,26 +28,15 @@ app.use(
   })
 );
 
-// Routes (оставляем старые временно)
-app.get('/notes', (req, res) => {
-  res.status(200).json({ message: 'Retrieved all notes' });
-});
-
-app.get('/notes/:noteId', (req, res) => {
-  const { noteId } = req.params;
-  res.status(200).json({ message: `Retrieved note with ID: ${noteId}` });
-});
+// Routes
+app.use('/api', authRoutes);
+app.use('/api', noteRoutes);
 
 // 404 middleware
-app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+app.use(notFoundHandler);
 
-// Error-handling middleware (500)
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: err.message });
-});
+// Error-handling middleware
+app.use(errorHandler);
 
 // Start server with MongoDB connection
 const startServer = async () => {
