@@ -1,47 +1,35 @@
 import express from 'express';
 import cors from 'cors';
-import pino from 'pino-http';
 import dotenv from 'dotenv';
+import { errors } from 'celebrate';
 
 import { connectMongoDB } from './db/connectMongoDB.js';
+import logger from './middleware/logger.js';
+import notFoundHandler from './middleware/notFoundHandler.js';
+import errorHandler from './middleware/errorHandler.js';
+import notesRoutes from './routes/notesRoutes.js';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const { PORT = 3000 } = process.env;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(
-  pino({
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    },
-  })
-);
+app.use(logger);
 
-// Routes (оставляем старые временно)
-app.get('/notes', (req, res) => {
-  res.status(200).json({ message: 'Retrieved all notes' });
-});
+// Routes
+app.use('/notes', notesRoutes);
 
-app.get('/notes/:noteId', (req, res) => {
-  const { noteId } = req.params;
-  res.status(200).json({ message: `Retrieved note with ID: ${noteId}` });
-});
+// Not found middleware
+app.use(notFoundHandler);
 
-// 404 middleware
-app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+// Celebrate validation errors
+app.use(errors());
 
-// Error-handling middleware (500)
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: err.message });
-});
+// Global error handler
+app.use(errorHandler);
 
 // Start server with MongoDB connection
 const startServer = async () => {
