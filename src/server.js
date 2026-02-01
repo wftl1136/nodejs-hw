@@ -8,6 +8,9 @@ import logger from './middleware/logger.js';
 import notFoundHandler from './middleware/notFoundHandler.js';
 import errorHandler from './middleware/errorHandler.js';
 import notesRoutes from './routes/notesRoutes.js';
+import userRoutes from './routes/userRoutes.js'; // ← добавили
+
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -21,9 +24,12 @@ app.use(logger);
 
 // Routes
 app.use('/notes', notesRoutes);
+app.use('/users', userRoutes); // ← добавили
 
 // Not found middleware
 app.use(notFoundHandler);
+
+app.use('/auth', authRoutes);
 
 // Celebrate validation errors
 app.use(errors());
