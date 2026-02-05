@@ -2,12 +2,108 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import createHttpError from "http-errors";
 import { User } from "../models/user.js";
+import { Session } from "../models/session.js";
 import { sendEmail } from "../utils/sendMail.js";
+import { createSession, setSessionCookies } from "../services/auth.js";
 import fs from "fs/promises";
 import path from "path";
 import handlebars from "handlebars";
 
 const templatePath = path.resolve("src/templates/reset-password-email.html");
+
+// ==================== AUTH ====================
+
+export const registerUser = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw createHttpError(409, "Email in use");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ email, password: hashedPassword });
+
+    const session = await createSession(user._id);
+    setSessionCookies(res, session);
+
+    res.status(201).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const loginUser = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      throw createHttpError(401, "Email or password is wrong");
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      throw createHttpError(401, "Email or password is wrong");
+    }
+
+    const session = await createSession(user._id);
+    setSessionCookies(res, session);
+
+    res.status(200).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logoutUser = async (req, res, next) => {
+  try {
+    const { sessionId } = req;
+    if (!sessionId) {
+      throw createHttpError(401, "Not authorized");
+    }
+
+    await Session.findByIdAndDelete(sessionId);
+
+    res.clearCookie("sessionId");
+    res.clearCookie("refreshToken");
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshUserSession = async (req, res, next) => {
+  try {
+    const { refreshToken, sessionId } = req.cookies;
+
+    if (!refreshToken || !sessionId) {
+      throw createHttpError(401, "Not authorized");
+    }
+
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      throw createHttpError(401, "Not authorized");
+    }
+
+    if (session.refreshToken !== refreshToken) {
+      throw createHttpError(401, "Not authorized");
+    }
+
+    const newSession = await createSession(session.userId);
+    await Session.findByIdAndDelete(sessionId);
+
+    setSessionCookies(res, newSession);
+
+    res.status(200).json({ message: "Session refreshed" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== PASSWORD RESET ====================
 
 export const requestResetEmail = async (req, res, next) => {
   try {
@@ -36,6 +132,7 @@ export const requestResetEmail = async (req, res, next) => {
 
     try {
       await sendEmail({
+        from: process.env.SMTP_FROM,
         to: user.email,
         subject: "Password reset",
         html,

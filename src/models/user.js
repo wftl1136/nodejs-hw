@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, model } from 'mongoose';
 
 const userSchema = new Schema(
   {
@@ -7,17 +7,23 @@ const userSchema = new Schema(
     password: { type: String, required: true },
     avatar: {
       type: String,
-      default: "https://ac.goit.global/fullstack/react/default-avatar.jpg",
+      default: 'https://ac.goit.global/fullstack/react/default-avatar.jpg',
     },
   },
   { timestamps: true }
 );
 
-userSchema.pre("save", function (next) {
+userSchema.pre('save', function (next) {
   if (!this.username) {
     this.username = this.email;
   }
   next();
 });
 
-export const User = model("User", userSchema);
+userSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
+};
+
+export const User = model('User', userSchema);
