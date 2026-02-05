@@ -19,7 +19,7 @@ export const registerUser = async (req, res, next) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      throw createHttpError(409, "Email in use");
+      throw createHttpError(400, "Email in use");
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -48,6 +48,9 @@ export const loginUser = async (req, res, next) => {
       throw createHttpError(401, "Email or password is wrong");
     }
 
+    // ❗ Удаляем старые сессии пользователя
+    await Session.deleteMany({ userId: user._id });
+
     const session = await createSession(user._id);
     setSessionCookies(res, session);
 
@@ -59,7 +62,7 @@ export const loginUser = async (req, res, next) => {
 
 export const logoutUser = async (req, res, next) => {
   try {
-    const { sessionId } = req;
+    const { sessionId } = req.cookies;
     if (!sessionId) {
       throw createHttpError(401, "Not authorized");
     }
@@ -68,6 +71,7 @@ export const logoutUser = async (req, res, next) => {
 
     res.clearCookie("sessionId");
     res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
 
     res.status(204).send();
   } catch (error) {
@@ -80,6 +84,13 @@ export const refreshUserSession = async (req, res, next) => {
     const { refreshToken, sessionId } = req.cookies;
 
     if (!refreshToken || !sessionId) {
+      throw createHttpError(401, "Not authorized");
+    }
+
+    // ❗ Проверяем срок действия refreshToken
+    try {
+      jwt.verify(refreshToken, process.env.JWT_SECRET);
+    } catch (error) {
       throw createHttpError(401, "Not authorized");
     }
 
@@ -111,7 +122,9 @@ export const requestResetEmail = async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(200).json({ message: "Password reset email sent successfully" });
+      return res
+        .status(200)
+        .json({ message: "Password reset email sent successfully" });
     }
 
     const token = jwt.sign(
@@ -138,10 +151,15 @@ export const requestResetEmail = async (req, res, next) => {
         html,
       });
     } catch (error) {
-      throw createHttpError(500, "Failed to send the email, please try again later.");
+      throw createHttpError(
+        500,
+        "Failed to send the email, please try again later."
+      );
     }
 
-    res.status(200).json({ message: "Password reset email sent successfully" });
+    res
+      .status(200)
+      .json({ message: "Password reset email sent successfully" });
   } catch (error) {
     next(error);
   }
@@ -158,7 +176,10 @@ export const resetPassword = async (req, res, next) => {
       throw createHttpError(401, "Invalid or expired token");
     }
 
-    const user = await User.findOne({ _id: payload.sub, email: payload.email });
+    const user = await User.findOne({
+      _id: payload.sub,
+      email: payload.email,
+    });
 
     if (!user) {
       throw createHttpError(404, "User not found");
